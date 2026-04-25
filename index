@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Commission Calculator</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; line-height: 1.6; padding: 20px; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #2c3e50; }
+        .disclaimer { background: #fff3cd; color: #856404; padding: 15px; border-radius: 5px; font-size: 0.9em; margin-bottom: 20px; border-left: 5px solid #ffeeba; }
+        label { font-weight: bold; display: block; margin-top: 15px; }
+        input[type="number"], select { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .stream-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #eee; }
+        .stream-row div { flex: 1; }
+        button { background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 15px; }
+        button:hover { background: #2980b9; }
+        .remove-btn { background: #e74c3c; }
+        .remove-btn:hover { background: #c0392b; }
+        .btn-calc { background: #27ae60; width: 100%; font-size: 18px; padding: 15px; font-weight: bold; margin-top: 30px; }
+        .btn-calc:hover { background: #2ecc71; }
+        .results { margin-top: 30px; padding: 20px; background: #e8f6f3; border-radius: 5px; border-left: 5px solid #1abc9c; display: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #2c3e50; color: white; }
+        .team-section { display: none; background: #eaf2f8; padding: 15px; border-radius: 5px; margin-top: 20px; border: 1px solid #d6eaf8; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎯 Sales Commission Calculator</h1>
+    
+    <div class="disclaimer">
+        <strong>OLD vs NEW Scheme Comparison (SOP V3.0)</strong><br>
+        This calculator has been constructed on the information and rules as understood and interpreted at the time of it being presented. <b>IT MAY NOT BE ACCURATE.</b> Please verify any calculations manually. Always get final approval from Sales Governance + Finance.
+    </div>
+
+    <label>Monthly Target Commission (ZAR):</label>
+    <input type="number" id="tc" placeholder="e.g. 27276">
+
+    <label>Select Group:</label>
+    <select id="group" onchange="toggleTeamSection()">
+        <option value="1">Group 1 (Account Exec, Key Account Specialist, Sales/Product Specialist)</option>
+        <option value="2">Group 2 (Head of Sales, National/Regional Manager, Senior Product Manager)</option>
+    </select>
+
+    <h3>Revenue Streams</h3>
+    <div id="streams-container">
+        </div>
+    <button type="button" onclick="addStream()">+ Add Another Stream</button>
+
+    <div class="team-section" id="team-section">
+        <h3>Team Component (Group 1 Only)</h3>
+        <label>Team Overall Target Revenue (Net Sales ZAR):</label>
+        <input type="number" id="teamTarget" placeholder="e.g. 19815000">
+        
+        <label>Team Actual Revenue (Net Sales ZAR):</label>
+        <input type="number" id="teamActual" placeholder="e.g. 16220500">
+        
+        <label>Team's TOTAL 'Revenue/Target Weighting' (ZAR):</label>
+        <input type="number" id="teamTotalWeighting" placeholder="e.g. 13724350">
+    </div>
+
+    <button type="button" class="btn-calc" onclick="calculate()">Calculate Commission</button>
+
+    <div id="results" class="results">
+        <h2>📊 Results</h2>
+        <div id="breakdown-table"></div>
+        <div id="comparison-table"></div>
+    </div>
+</div>
+
+<script>
+    // --- ENGINE LOCKED HELPER FUNCTIONS ---
+    function getNewMultiplier(group, achievedPct) {
+        achievedPct = Math.min(achievedPct, 200.0);
+        if (group === 1) {
+            if (achievedPct < 100) return 0.0;
+            return 1.1 + 0.02 * (achievedPct - 100);
+        } else {
+            if (achievedPct < 80) return 0.0;
+            if (achievedPct <= 100) return 0.34 + 0.038 * (achievedPct - 80);
+            return 1.1 + 0.02 * (achievedPct - 100);
+        }
+    }
+
+    function getOldMultiplier(achievedPct) {
+        achievedPct = Math.min(achievedPct, 200.0);
+        if (achievedPct < 100) return 0.0;
+        if (achievedPct < 120) return 1.0;
+        if (achievedPct < 150) return 2.1;
+        if (achievedPct < 180) return 4.1;
+        return 6.2;
+    }
+
+    function getTeamPoolRate(teamAchievedPct) {
+        if (teamAchievedPct < 80) return 0.0;
+        let rate = 2.0 + 0.06 * (teamAchievedPct - 80);
+        return Math.min(rate, 5.0);
+    }
+
+    // --- UI FUNCTIONS ---
+    let streamCount = 0;
+
+    function addStream() {
+        streamCount++;
+        const container = document.getElementById('streams-container');
+        const row = document.createElement('div');
+        row.className = 'stream-row';
+        row.id = `stream-${streamCount}`;
+        row.innerHTML = `
+            <div>
+                <label>Weighting %</label>
+                <input type="number" class="s-weight" placeholder="e.g. 70">
+            </div>
+            <div>
+                <label>Target (ZAR)</label>
+                <input type="number" class="s-target" placeholder="e.g. 3500000">
+            </div>
+            <div>
+                <label>Actual (ZAR)</label>
+                <input type="number" class="s-actual" placeholder="e.g. 3000000">
+            </div>
+            <button type="button" class="remove-btn" onclick="removeStream('${row.id}')">X</button>
+        `;
+        container.appendChild(row);
+    }
+
+    function removeStream(id) {
+        document.getElementById(id).remove();
+    }
+
+    function toggleTeamSection() {
+        const group = document.getElementById('group').value;
+        const teamSection = document.getElementById('team-section');
+        teamSection.style.display = group === "1" ? "block" : "none";
+    }
+
+    // Format currency Helper
+    const formatter = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' });
+
+    // --- MAIN CALCULATION ---
+    function calculate() {
+        const tc = parseFloat(document.getElementById('tc').value) || 0;
+        const group = parseInt(document.getElementById('group').value);
+        const indThresholdNew = group === 1 ? 75.0 : 80.0;
+
+        let totalTarget = 0, totalActual = 0;
+        let allStreamsAchieved = true;
+        const streamData = [];
+
+        // Collect streams
+        const rows = document.querySelectorAll('.stream-row');
+        if(rows.length === 0) { alert("Please add at least one stream!"); return; }
+
+        rows.forEach((row, index) => {
+            const w = parseFloat(row.querySelector('.s-weight').value) || 0;
+            const t = parseFloat(row.querySelector('.s-target').value) || 0;
+            const a = parseFloat(row.querySelector('.s-actual').value) || 0;
+            
+            totalTarget += t;
+            totalActual += a;
+            if (a < t) allStreamsAchieved = false;
+
+            streamData.push({ id: index + 1, weight: w, target: t, actual: a });
+        });
+
+        const overallPct = totalTarget > 0 ? (totalActual / totalTarget * 100) : 0.0;
+
+        // Team Logic
+        let teamComNew = 0;
+        let teamOutputHtml = "";
+        
+        if (group === 1) {
+            const teamTarget = parseFloat(document.getElementById('teamTarget').value) || 0;
+            const teamActual = parseFloat(document.getElementById('teamActual').value) || 0;
+            const teamTotalWeight = parseFloat(document.getElementById('teamTotalWeighting').value) || 0;
+
+            if (teamTarget > 0) {
+                const teamOverallPct = (teamActual / teamTarget) * 100;
+                const rate = getTeamPoolRate(teamOverallPct);
+                
+                if (rate > 0) {
+                    const excessTeam = teamActual - (0.8 * teamTarget);
+                    const teamPool = excessTeam * (rate / 100);
+                    
+                    const myWeighting = totalActual * (overallPct / 100);
+                    const sharePct = teamTotalWeight > 0 ? (myWeighting / teamTotalWeight) * 100 : 0;
+
+                    if (overallPct >= indThresholdNew) {
+                        teamComNew = teamPool * (sharePct / 100);
+                        const teamCap = 3.1 * tc;
+                        if (teamComNew > teamCap) teamComNew = teamCap;
+                        
+                        teamOutputHtml = `Team Pool Rate: ${rate.toFixed(2)}% | Your Share: ${sharePct.toFixed(2)}% | Payout: ${formatter.format(teamComNew)}`;
+                    } else {
+                        teamOutputHtml = `Failed individual 75% threshold. Team payout forfeited.`;
+                        teamComNew = 0;
+                    }
+                } else {
+                    teamOutputHtml = `Team below 80% threshold. Pool = R0.`;
+                }
+            } else {
+                teamOutputHtml = `No team targets entered.`;
+            }
+        }
+
+        // Old Scheme Logic
+        let oldIndCom = 0;
+        if (overallPct < 100 && group === 1) {
+            streamData.forEach(s => {
+                if (s.actual >= s.target) oldIndCom += tc * (s.weight / 100);
+            });
+        } else {
+            oldIndCom = getOldMultiplier(overallPct) * tc;
+        }
+        if (allStreamsAchieved) oldIndCom += 0.05 * tc;
+        const oldTotal = oldIndCom;
+
+        // New Scheme Logic
+        let newIndCom = 0;
+        let capWarning = "";
+        if (overallPct < indThresholdNew) {
+            newIndCom = 0;
+        } else if (overallPct < 100 && group === 1) {
+            streamData.forEach(s => {
+                if (s.actual >= s.target) newIndCom += tc * (s.weight / 100);
+            });
+        } else {
+            newIndCom = getNewMultiplier(group, overallPct) * tc;
+        }
+        if (allStreamsAchieved) newIndCom += 0.05 * tc;
+
+        // Incremental Cap
+        if (overallPct > 100 && totalTarget > 0) {
+            const excessRev = totalActual - totalTarget;
+            if (excessRev > 0) {
+                const calculatedInc = Math.max(0.0, newIndCom - tc);
+                const maxInc = 0.10 * excessRev;
+                if (calculatedInc > maxInc) {
+                    newIndCom = tc + maxInc;
+                    capWarning = `<br><span style="color: red;"><strong>[!]</strong> New Scheme incremental cap applied (10% of excess revenue)</span>`;
+                }
+            }
+        }
+        const newTotal = newIndCom + teamComNew;
+
+        // Output Display
+        let streamHtml = `<table><tr><th>Stream</th><th>Target Comm</th><th>Target Rev</th><th>Actual Rev</th><th>Achieved %</th></tr>`;
+        streamData.forEach(s => {
+            const sTc = tc * (s.weight / 100);
+            const sAch = s.target > 0 ? (s.actual / s.target * 100) : 0;
+            streamHtml += `<tr><td>${s.id}</td><td>${formatter.format(sTc)}</td><td>${formatter.format(s.target)}</td><td>${formatter.format(s.actual)}</td><td>${sAch.toFixed(2)}%</td></tr>`;
+        });
+        streamHtml += `</table><p><strong>OVERALL AGGREGATE ACHIEVEMENT: ${overallPct.toFixed(2)}%</strong></p>`;
+        
+        if(group === 1) streamHtml += `<p><strong>TEAM DATA:</strong> ${teamOutputHtml}</p>`;
+
+        document.getElementById('breakdown-table').innerHTML = streamHtml;
+
+        let diff = newTotal - oldTotal;
+        let diffText = diff >= 0 ? `(New is Higher)` : `(Old is Higher)`;
+
+        document.getElementById('comparison-table').innerHTML = `
+            <h3>OLD vs NEW Scheme Comparison</h3>
+            <table>
+                <tr><th>Metric</th><th>OLD Scheme</th><th>NEW Scheme</th></tr>
+                <tr><td>Individual Commission</td><td>${formatter.format(oldIndCom)}</td><td>${formatter.format(newIndCom)}</td></tr>
+                ${group === 1 ? `<tr><td>Team Commission Pool (share)</td><td>-</td><td>${formatter.format(teamComNew)}</td></tr>` : ''}
+                <tr><td><strong>TOTAL COMMISSION</strong></td><td><strong>${formatter.format(oldTotal)}</strong></td><td><strong>${formatter.format(newTotal)}</strong></td></tr>
+            </table>
+            <p><strong>Difference: ${formatter.format(Math.abs(diff))} ${diffText}</strong> ${capWarning}</p>
+        `;
+
+        document.getElementById('results').style.display = 'block';
+    }
+
+    // Initialize
+    toggleTeamSection();
+    addStream(); // Add first stream row by default
+</script>
+</body>
+</html>
