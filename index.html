@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Commission Calculator v1.0</title>
+    <title>Sales Commission Calculator v1.1</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; line-height: 1.6; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -29,7 +29,7 @@
 <body>
 
 <div class="container">
-    <h1>🎯 Sales Commission Calculator <small style="font-size: 0.5em; color: #7f8c8d;">v1.0</small></h1>
+    <h1>🎯 Sales Commission Calculator <small style="font-size: 0.5em; color: #7f8c8d;">v1.1</small></h1>
     
     <div class="disclaimer">
         <strong>OLD vs NEW Scheme Comparison (SOP V3.0)</strong><br>
@@ -212,32 +212,45 @@
             }
         }
 
-        // Old Scheme Logic
+        // --- OLD SCHEME LOGIC ---
         let oldIndCom = 0;
+        let oldBaseMult = 0.00;
+        let oldBonusMult = 0.00;
+
         if (overallPct < 100) {
+            oldBaseMult = 0.00; // No multiplier, paid strictly on streams
             streamData.forEach(s => {
                 if (s.actual >= s.target) oldIndCom += tc * (s.weight / 100);
             });
         } else {
-            oldIndCom = getOldMultiplier(overallPct) * tc;
+            oldBaseMult = getOldMultiplier(overallPct);
+            oldIndCom = oldBaseMult * tc;
         }
-        if (allStreamsAchieved) oldIndCom += 0.05 * tc;
+
+        if (allStreamsAchieved) {
+            oldBonusMult = 0.05;
+            oldIndCom += oldBonusMult * tc;
+        }
         const oldTotal = oldIndCom;
 
-        // New Scheme Logic 
+        // --- NEW SCHEME LOGIC ---
         let newIndCom = 0;
         let baseComm = 0;
-        let bonusComm = 0;
+        let newBaseMult = 0.00;
+        let newBonusMult = 0.00;
         let capWarning = "";
         
         if (overallPct < indThresholdNew) {
             baseComm = 0;
+            newBaseMult = 0.00;
         } else if (overallPct < 100 && group === 1) {
+            newBaseMult = 0.00; // No multiplier, paid strictly on streams
             streamData.forEach(s => {
                 if (s.actual >= s.target) baseComm += tc * (s.weight / 100);
             });
         } else {
-            baseComm = getNewMultiplier(group, overallPct) * tc;
+            newBaseMult = getNewMultiplier(group, overallPct);
+            baseComm = newBaseMult * tc;
         }
 
         // Incremental Cap applied to base commission BEFORE the 5% bonus is added.
@@ -255,13 +268,13 @@
 
         // Add the 5% bonus safely on top of the capped base commission
         if (allStreamsAchieved) {
-            bonusComm = 0.05 * tc;
+            newBonusMult = 0.05;
         }
 
-        newIndCom = baseComm + bonusComm;
+        newIndCom = baseComm + (newBonusMult * tc);
         const newTotal = newIndCom + teamComNew;
 
-        // Output Display
+        // --- OUTPUT DISPLAY ---
         let streamHtml = `<table><tr><th>Stream</th><th>Target Comm</th><th>Target Rev</th><th>Actual Rev</th><th>Achieved %</th></tr>`;
         streamData.forEach(s => {
             const sTc = tc * (s.weight / 100);
@@ -281,6 +294,16 @@
             <h3>OLD vs NEW Scheme Comparison</h3>
             <table>
                 <tr><th>Metric</th><th>OLD Scheme</th><th>NEW Scheme</th></tr>
+                <tr style="background-color: #f9f9f9; font-size: 0.9em; color: #555;">
+                    <td><em>Base Multiplier Used</em></td>
+                    <td><em>${oldBaseMult.toFixed(2)}x</em></td>
+                    <td><em>${newBaseMult.toFixed(2)}x</em></td>
+                </tr>
+                <tr style="background-color: #f9f9f9; font-size: 0.9em; color: #555;">
+                    <td><em>All-Targets-Achieved Bonus</em></td>
+                    <td><em>${oldBonusMult.toFixed(2)}x</em></td>
+                    <td><em>${newBonusMult.toFixed(2)}x</em></td>
+                </tr>
                 <tr><td>Individual Commission</td><td>${formatter.format(oldIndCom)}</td><td>${formatter.format(newIndCom)}</td></tr>
                 ${group === 1 ? `<tr><td>Team Commission Pool (share)</td><td>-</td><td>${formatter.format(teamComNew)}</td></tr>` : ''}
                 <tr><td><strong>TOTAL COMMISSION</strong></td><td><strong>${formatter.format(oldTotal)}</strong></td><td><strong>${formatter.format(newTotal)}</strong></td></tr>
