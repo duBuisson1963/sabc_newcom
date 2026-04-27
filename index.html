@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Commission Calculator v1.1</title>
+    <title>Sales Commission Calculator v1.2</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; line-height: 1.6; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -29,7 +29,7 @@
 <body>
 
 <div class="container">
-    <h1>🎯 Sales Commission Calculator <small style="font-size: 0.5em; color: #7f8c8d;">v1.1</small></h1>
+    <h1>🎯 Sales Commission Calculator <small style="font-size: 0.5em; color: #7f8c8d;">v1.2</small></h1>
     
     <div class="disclaimer">
         <strong>OLD vs NEW Scheme Comparison (SOP V3.0)</strong><br>
@@ -40,9 +40,9 @@
     <input type="number" id="tc" placeholder="e.g. 89375">
 
     <label>Select Group:</label>
-    <select id="group" onchange="toggleTeamSection()">
-        <option value="1">Group 1 (Account Exec, Key Account Specialist, Sales/Product Specialist)</option>
-        <option value="2" selected>Group 2 (Head of Sales, National/Regional Manager, Senior Product Manager)</option>
+    <select id="group" onchange="toggleTeamSection(); updateGroupTitle();">
+        <option value="1" selected>Group 1 (Account Exec, Key Account Specialist, Sales/Product Specialist)</option>
+        <option value="2">Group 2 (Head of Sales, National/Regional Manager, Senior Product Manager)</option>
     </select>
 
     <h3>Revenue Streams</h3>
@@ -65,7 +65,7 @@
     <button type="button" class="btn-calc" onclick="calculate()">Calculate Commission</button>
 
     <div id="results" class="results">
-        <h2>📊 Results</h2>
+        <h2>📊 Results <span id="active-group-label" style="font-size: 0.6em; color: #3498db;">(Group 1)</span></h2>
         <div id="breakdown-table"></div>
         <div id="comparison-table"></div>
     </div>
@@ -140,6 +140,11 @@
         const group = document.getElementById('group').value;
         const teamSection = document.getElementById('team-section');
         teamSection.style.display = group === "1" ? "block" : "none";
+    }
+
+    function updateGroupTitle() {
+        const group = document.getElementById('group').value;
+        document.getElementById('active-group-label').innerText = `(Group ${group})`;
     }
 
     // Format currency Helper
@@ -315,6 +320,7 @@
     }
 
     // Initialize
+    updateGroupTitle();
     toggleTeamSection();
     addStream(); // Add first stream row by default
 </script>
