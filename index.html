@@ -73,14 +73,22 @@
 
 <script>
     // --- ENGINE HELPER FUNCTIONS ---
-    function getNewMultiplier(achievedPct) {
+    function getNewMultiplier(group, achievedPct) {
         achievedPct = Math.min(achievedPct, 200.0);
-        // Above 100%, both groups use the exact same growth multiplier
-        return 1.1 + 0.02 * (achievedPct - 100);
+        if (group === 1) {
+            if (achievedPct < 100) return 0.0;
+            return 1.1 + 0.02 * (achievedPct - 100);
+        } else {
+            // Group 2 Sliding Scale
+            if (achievedPct < 80) return 0.0;
+            if (achievedPct <= 100) return 0.34 + 0.038 * (achievedPct - 80);
+            return 1.1 + 0.02 * (achievedPct - 100);
+        }
     }
 
     function getOldMultiplier(achievedPct) {
         achievedPct = Math.min(achievedPct, 200.0);
+        if (achievedPct < 100) return 0.0;
         if (achievedPct < 120) return 1.0;
         if (achievedPct < 150) return 2.1;
         if (achievedPct < 180) return 4.1;
@@ -137,8 +145,6 @@
     function calculate() {
         const tc = parseFloat(document.getElementById('tc').value) || 0;
         const group = parseInt(document.getElementById('group').value);
-        
-        // Group 1 needs 75%, Group 2 needs 80% to earn ANYTHING under the New Scheme
         const indThresholdNew = group === 1 ? 75.0 : 80.0;
 
         let totalTarget = 0, totalActual = 0;
@@ -201,7 +207,7 @@
             }
         }
 
-        // --- OLD SCHEME LOGIC ---
+        // Old Scheme Logic (Correctly applies stream-by-stream for EVERYONE under 100%)
         let oldIndCom = 0;
         if (overallPct < 100) {
             streamData.forEach(s => {
@@ -213,23 +219,22 @@
         if (allStreamsAchieved) oldIndCom += 0.05 * tc;
         const oldTotal = oldIndCom;
 
-        // --- NEW SCHEME LOGIC ---
+        // New Scheme Logic (Group 2 uses 0.72 multiplier, Group 1 uses stream-by-stream under 100%)
         let newIndCom = 0;
         let baseComm = 0;
         let bonusComm = 0;
         let capWarning = "";
         
         if (overallPct < indThresholdNew) {
-            // Failed to hit the minimum threshold (75% or 80%) = R0
             baseComm = 0;
-        } else if (overallPct < 100) {
-            // Reached threshold but under 100%: BOTH groups get paid stream-by-stream
+        } else if (overallPct < 100 && group === 1) {
+            // Only Group 1 gets stream-by-stream in the New Scheme
             streamData.forEach(s => {
                 if (s.actual >= s.target) baseComm += tc * (s.weight / 100);
             });
         } else {
-            // Over 100%: Multiplier kicks in
-            baseComm = getNewMultiplier(overallPct) * tc;
+            // Group 2 uses their sliding scale formula multiplier here
+            baseComm = getNewMultiplier(group, overallPct) * tc;
         }
 
         // Incremental Cap applied to base commission BEFORE the 5% bonus is added.
@@ -245,6 +250,7 @@
             }
         }
 
+        // Add the 5% bonus safely on top of the capped base commission
         if (allStreamsAchieved) {
             bonusComm = 0.05 * tc;
         }
