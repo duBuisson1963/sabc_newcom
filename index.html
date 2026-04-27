@@ -37,12 +37,12 @@
     </div>
 
     <label>Monthly Target Commission (ZAR):</label>
-    <input type="number" id="tc" placeholder="e.g. 27276">
+    <input type="number" id="tc" placeholder="e.g. 89375">
 
     <label>Select Group:</label>
     <select id="group" onchange="toggleTeamSection()">
         <option value="1">Group 1 (Account Exec, Key Account Specialist, Sales/Product Specialist)</option>
-        <option value="2">Group 2 (Head of Sales, National/Regional Manager, Senior Product Manager)</option>
+        <option value="2" selected>Group 2 (Head of Sales, National/Regional Manager, Senior Product Manager)</option>
     </select>
 
     <h3>Revenue Streams</h3>
@@ -73,20 +73,14 @@
 
 <script>
     // --- ENGINE HELPER FUNCTIONS ---
-    function getNewMultiplier(group, achievedPct) {
+    function getNewMultiplier(achievedPct) {
         achievedPct = Math.min(achievedPct, 200.0);
-        if (group === 1) {
-            if (achievedPct < 100) return 0.0;
-            return 1.1 + 0.02 * (achievedPct - 100);
-        } else {
-            if (achievedPct < 80) return 0.0;
-            return 1.1 + 0.02 * (achievedPct - 100);
-        }
+        // Above 100%, both groups use the exact same growth multiplier
+        return 1.1 + 0.02 * (achievedPct - 100);
     }
 
     function getOldMultiplier(achievedPct) {
         achievedPct = Math.min(achievedPct, 200.0);
-        if (achievedPct < 100) return 0.0;
         if (achievedPct < 120) return 1.0;
         if (achievedPct < 150) return 2.1;
         if (achievedPct < 180) return 4.1;
@@ -143,6 +137,8 @@
     function calculate() {
         const tc = parseFloat(document.getElementById('tc').value) || 0;
         const group = parseInt(document.getElementById('group').value);
+        
+        // Group 1 needs 75%, Group 2 needs 80% to earn ANYTHING under the New Scheme
         const indThresholdNew = group === 1 ? 75.0 : 80.0;
 
         let totalTarget = 0, totalActual = 0;
@@ -205,7 +201,7 @@
             }
         }
 
-        // Old Scheme Logic
+        // --- OLD SCHEME LOGIC ---
         let oldIndCom = 0;
         if (overallPct < 100) {
             streamData.forEach(s => {
@@ -217,20 +213,23 @@
         if (allStreamsAchieved) oldIndCom += 0.05 * tc;
         const oldTotal = oldIndCom;
 
-        // New Scheme Logic (BUG FIXED: Group 2 now correctly uses stream-by-stream under 100%)
+        // --- NEW SCHEME LOGIC ---
         let newIndCom = 0;
         let baseComm = 0;
         let bonusComm = 0;
         let capWarning = "";
         
         if (overallPct < indThresholdNew) {
+            // Failed to hit the minimum threshold (75% or 80%) = R0
             baseComm = 0;
-        } else if (overallPct < 100) {  // <-- The fix is here! Removed the lock to just Group 1.
+        } else if (overallPct < 100) {
+            // Reached threshold but under 100%: BOTH groups get paid stream-by-stream
             streamData.forEach(s => {
                 if (s.actual >= s.target) baseComm += tc * (s.weight / 100);
             });
         } else {
-            baseComm = getNewMultiplier(group, overallPct) * tc;
+            // Over 100%: Multiplier kicks in
+            baseComm = getNewMultiplier(overallPct) * tc;
         }
 
         // Incremental Cap applied to base commission BEFORE the 5% bonus is added.
@@ -246,7 +245,6 @@
             }
         }
 
-        // Add the 5% bonus safely on top of the capped base commission
         if (allStreamsAchieved) {
             bonusComm = 0.05 * tc;
         }
