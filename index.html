@@ -72,7 +72,7 @@
 </div>
 
 <script>
-    // --- ENGINE LOCKED HELPER FUNCTIONS ---
+    // --- ENGINE HELPER FUNCTIONS ---
     function getNewMultiplier(group, achievedPct) {
         achievedPct = Math.min(achievedPct, 200.0);
         if (group === 1) {
@@ -80,7 +80,6 @@
             return 1.1 + 0.02 * (achievedPct - 100);
         } else {
             if (achievedPct < 80) return 0.0;
-            if (achievedPct <= 100) return 0.34 + 0.038 * (achievedPct - 80);
             return 1.1 + 0.02 * (achievedPct - 100);
         }
     }
@@ -206,7 +205,7 @@
             }
         }
 
-        // Old Scheme Logic (BUG FIXED: Now applies stream-by-stream to ALL groups)
+        // Old Scheme Logic
         let oldIndCom = 0;
         if (overallPct < 100) {
             streamData.forEach(s => {
@@ -218,7 +217,7 @@
         if (allStreamsAchieved) oldIndCom += 0.05 * tc;
         const oldTotal = oldIndCom;
 
-        // New Scheme Logic
+        // New Scheme Logic (BUG FIXED: Group 2 now correctly uses stream-by-stream under 100%)
         let newIndCom = 0;
         let baseComm = 0;
         let bonusComm = 0;
@@ -226,7 +225,7 @@
         
         if (overallPct < indThresholdNew) {
             baseComm = 0;
-        } else if (overallPct < 100 && group === 1) {
+        } else if (overallPct < 100) {  // <-- The fix is here! Removed the lock to just Group 1.
             streamData.forEach(s => {
                 if (s.actual >= s.target) baseComm += tc * (s.weight / 100);
             });
