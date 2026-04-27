@@ -96,7 +96,6 @@
 
     function getTeamPoolRate(teamAchievedPct) {
         if (teamAchievedPct < 80) return 0.0;
-        // BUG FIX: Spreadsheet floors the team percentage (e.g., 89.4% -> 89.0%) before applying rate math.
         let rate = 2.0 + 0.06 * (Math.floor(teamAchievedPct) - 80);
         return Math.min(rate, 5.0);
     }
@@ -207,9 +206,9 @@
             }
         }
 
-        // Old Scheme Logic
+        // Old Scheme Logic (BUG FIXED: Now applies stream-by-stream to ALL groups)
         let oldIndCom = 0;
-        if (overallPct < 100 && group === 1) {
+        if (overallPct < 100) {
             streamData.forEach(s => {
                 if (s.actual >= s.target) oldIndCom += tc * (s.weight / 100);
             });
@@ -235,7 +234,7 @@
             baseComm = getNewMultiplier(group, overallPct) * tc;
         }
 
-        // BUG FIX: Incremental Cap must be applied to base commission BEFORE the 5% bonus is added.
+        // Incremental Cap applied to base commission BEFORE the 5% bonus is added.
         if (overallPct > 100 && totalTarget > 0) {
             const excessRev = totalActual - totalTarget;
             if (excessRev > 0) {
