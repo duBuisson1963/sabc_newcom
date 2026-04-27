@@ -74,12 +74,13 @@
 <script>
     // --- ENGINE HELPER FUNCTIONS ---
     function getNewMultiplier(group, achievedPct) {
+        achievedPct = Math.round(achievedPct * 100) / 100;
         achievedPct = Math.min(achievedPct, 200.0);
+        
         if (group === 1) {
             if (achievedPct < 100) return 0.0;
             return 1.1 + 0.02 * (achievedPct - 100);
         } else {
-            // Group 2 Sliding Scale
             if (achievedPct < 80) return 0.0;
             if (achievedPct <= 100) return 0.34 + 0.038 * (achievedPct - 80);
             return 1.1 + 0.02 * (achievedPct - 100);
@@ -87,11 +88,14 @@
     }
 
     function getOldMultiplier(achievedPct) {
+        achievedPct = Math.round(achievedPct * 100) / 100;
         achievedPct = Math.min(achievedPct, 200.0);
+        
+        // FIX: Excel rules use "Up to and including" (<=) for these tier boundaries!
         if (achievedPct < 100) return 0.0;
-        if (achievedPct < 120) return 1.0;
-        if (achievedPct < 150) return 2.1;
-        if (achievedPct < 180) return 4.1;
+        if (achievedPct <= 120) return 1.0;
+        if (achievedPct <= 150) return 2.1;
+        if (achievedPct <= 180) return 4.1;
         return 6.2;
     }
 
@@ -167,7 +171,8 @@
             streamData.push({ id: index + 1, weight: w, target: t, actual: a });
         });
 
-        const overallPct = totalTarget > 0 ? (totalActual / totalTarget * 100) : 0.0;
+        const rawPct = totalTarget > 0 ? (totalActual / totalTarget * 100) : 0.0;
+        const overallPct = Math.round(rawPct * 100) / 100;
 
         // Team Logic
         let teamComNew = 0;
@@ -207,7 +212,7 @@
             }
         }
 
-        // Old Scheme Logic (Correctly applies stream-by-stream for EVERYONE under 100%)
+        // Old Scheme Logic
         let oldIndCom = 0;
         if (overallPct < 100) {
             streamData.forEach(s => {
@@ -219,7 +224,7 @@
         if (allStreamsAchieved) oldIndCom += 0.05 * tc;
         const oldTotal = oldIndCom;
 
-        // New Scheme Logic (Group 2 uses 0.72 multiplier, Group 1 uses stream-by-stream under 100%)
+        // New Scheme Logic 
         let newIndCom = 0;
         let baseComm = 0;
         let bonusComm = 0;
@@ -228,12 +233,10 @@
         if (overallPct < indThresholdNew) {
             baseComm = 0;
         } else if (overallPct < 100 && group === 1) {
-            // Only Group 1 gets stream-by-stream in the New Scheme
             streamData.forEach(s => {
                 if (s.actual >= s.target) baseComm += tc * (s.weight / 100);
             });
         } else {
-            // Group 2 uses their sliding scale formula multiplier here
             baseComm = getNewMultiplier(group, overallPct) * tc;
         }
 
